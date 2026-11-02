@@ -2,6 +2,18 @@
 
 All notable changes to the "C Array Image Preview" extension will be documented in this file.
 
+## 1.1.0 - 2026-11-02
+
+### Added
+- MSB/LSB bit order selection for packed 1bpp images (MSB by default).
+- Font sheet previews for nested packed 1bpp arrays, including dhepper/font8x8.
+- Font sheets from flat byte arrays, grouped by glyph dimensions and layout.
+- Individual glyph previews with array indices when hovering inside a nested initializer or over bytes in a flat array.
+- Font sheet cells placed without added spacing, preserving original glyph whitespace.
+
+### Fixed
+- Ignore braces in comments when finding array initializer boundaries.
+
 ## 1.0.2 - 2026-11-01
 
 ### Added

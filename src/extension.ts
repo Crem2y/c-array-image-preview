@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import { findPreviewArray } from "./previewParser";
-import { render1bpp, renderRgb565 } from "./previewRenderer";
+import { render1bpp, renderRgb565, render1bppSheet } from "./previewRenderer";
 
 export function activate(
     context: vscode.ExtensionContext
@@ -25,9 +25,14 @@ export function activate(
 
                     const {
                         metadata,
-                        name,
-                        values
+                        name
                     } = preview;
+                    const glyphIndex = preview.glyphs?.findIndex(glyph =>
+                        hoverOffset >= glyph.start && hoverOffset <= glyph.end
+                    ) ?? -1;
+                    const selectedGlyph = glyphIndex >= 0 ? preview.glyphs?.[glyphIndex] : undefined;
+                    const values = selectedGlyph?.values ?? preview.values;
+                    const title = selectedGlyph ? `${name}[${glyphIndex}]` : name;
 
                     const requiredLength =
                         metadata.type === "rgb565"
@@ -59,21 +64,24 @@ export function activate(
                         return new vscode.Hover("RGB565 requires 8-bit array elements (0–255).");
                     }
 
-                    const base64 = metadata.type === "rgb565"
+                    const base64 = preview.glyphs && !selectedGlyph
+                        ? render1bppSheet(preview.glyphs.map(glyph => glyph.values), metadata)
+                        : metadata.type === "rgb565"
                         ? renderRgb565(values, metadata.width, metadata.height, metadata.layout)
                         : render1bpp(
                         values,
                         metadata.width,
                         metadata.height,
                         metadata.layout,
-                        metadata.packing
+                        metadata.packing,
+                        metadata.bitOrder
                     );
 
                     const md =
                         new vscode.MarkdownString();
 
                     md.appendMarkdown(
-                        `### ${name}\n\n`
+                        `### ${title}\n\n`
                     );
 
                     md.appendMarkdown(
@@ -81,6 +89,9 @@ export function activate(
                         `${metadata.height} · ` +
                         `${metadata.type}\n\n`
                     );
+                    if (preview.glyphs && !selectedGlyph) {
+                        md.appendMarkdown(`${preview.glyphs.length} glyphs · ${metadata.sheet?.columns} columns\n\n`);
+                    }
 
                     md.appendMarkdown(
                         `![](data:image/png;base64,${base64})`

@@ -1,5 +1,6 @@
 import { PNG } from "pngjs";
-import { PreviewLayout, PreviewPacking } from "./previewTypes";
+import { PreviewLayout, PreviewPacking, PreviewBitOrder, PreviewMetadata } from "./previewTypes";
+import { getSheetSize } from "./previewSheet";
 
 const MAX_PREVIEW_SCALE = 4;
 const TARGET_PREVIEW_SIZE = 256;
@@ -16,7 +17,8 @@ export function render1bpp(
     width: number,
     height: number,
     layout: PreviewLayout,
-    packing: PreviewPacking = "packed"
+    packing: PreviewPacking = "packed",
+    bitOrder: PreviewBitOrder = "msb"
 ): string {
     const scale = getPreviewScale(width, height);
     const outputWidth = width * scale;
@@ -32,8 +34,8 @@ export function render1bpp(
             const bit = packing === "unpacked"
                 ? (values[layout === "horizontal" ? y * width + x : x * height + y] ?? 0)
                 : layout === "horizontal"
-                ? getHorizontalBit(values, width, x, y)
-                : getVerticalBit(values, height, x, y);
+                ? getHorizontalBit(values, width, x, y, bitOrder)
+                : getVerticalBit(values, height, x, y, bitOrder);
 
             const color = bit === 0 ? 255 : 0;
 
@@ -47,6 +49,30 @@ export function render1bpp(
         }
     }
 
+    return PNG.sync.write(png).toString("base64");
+}
+
+export function render1bppSheet(glyphs: number[][], metadata: PreviewMetadata): string {
+    const size = metadata.sheet && getSheetSize(
+        metadata.width, metadata.height, glyphs.length, metadata.sheet.columns
+    );
+    if (!size) { throw new Error("Invalid or oversized font sheet"); }
+    const scale = getPreviewScale(size.width, size.height);
+    const png = new PNG({ width: size.width * scale, height: size.height * scale });
+    // Blank glyphs and unused cells are opaque white.
+    png.data.fill(255);
+    glyphs.forEach((values, index) => {
+        const originX = (index % size.columns) * metadata.width;
+        const originY = Math.floor(index / size.columns) * metadata.height;
+        for (let y = 0; y < metadata.height; y++) {
+            for (let x = 0; x < metadata.width; x++) {
+                const bit = metadata.layout === "horizontal"
+                    ? getHorizontalBit(values, metadata.width, x, y, metadata.bitOrder)
+                    : getVerticalBit(values, metadata.height, x, y, metadata.bitOrder);
+                drawScaledPixel(png, originX + x, originY + y, scale, bit ? 0 : 255);
+            }
+        }
+    });
     return PNG.sync.write(png).toString("base64");
 }
 
@@ -115,14 +141,15 @@ function getHorizontalBit(
     values: number[],
     width: number,
     x: number,
-    y: number
+    y: number,
+    bitOrder: PreviewBitOrder
 ): number {
     const bytesPerRow = Math.ceil(width / 8);
 
     const byteIndex =
         y * bytesPerRow + Math.floor(x / 8);
 
-    const bitIndex = 7 - (x % 8);
+    const bitIndex = bitOrder === "lsb" ? x % 8 : 7 - (x % 8);
 
     return ((values[byteIndex] ?? 0) >> bitIndex) & 1;
 }
@@ -131,14 +158,15 @@ function getVerticalBit(
     values: number[],
     height: number,
     x: number,
-    y: number
+    y: number,
+    bitOrder: PreviewBitOrder
 ): number {
     const bytesPerColumn = Math.ceil(height / 8);
 
     const byteIndex =
         x * bytesPerColumn + Math.floor(y / 8);
 
-    const bitIndex = 7 - (y % 8);
+    const bitIndex = bitOrder === "lsb" ? y % 8 : 7 - (y % 8);
 
     return ((values[byteIndex] ?? 0) >> bitIndex) & 1;
 }

@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
+import { getSheetSize } from "./previewSheet";
 import {
     PreviewArray,
-    PreviewMetadata
+    PreviewMetadata,
+    PreviewGlyph
 } from "./previewTypes";
 
 export function findPreviewArray(
@@ -9,13 +11,15 @@ export function findPreviewArray(
     hoverOffset: number
 ): PreviewArray | undefined {
     const source = document.getText();
+    // Keep offsets intact while excluding comments from structural scanning.
+    const structure = maskComments(source);
 
     const arrayPattern =
         /\b([A-Za-z_]\w*)\s*(?:\[[^\]]*\]\s*)+=\s*\{/g;
 
     let match: RegExpExecArray | null;
 
-    while ((match = arrayPattern.exec(source)) !== null) {
+    while ((match = arrayPattern.exec(structure)) !== null) {
         const name = match[1];
 
         // 정규식이 찾은 배열 이름의 시작 위치
@@ -29,7 +33,7 @@ export function findPreviewArray(
             match.index + match[0].lastIndexOf("{");
 
         const initializerEnd = findMatchingBrace(
-            source,
+            structure,
             initializerStart
         );
 
@@ -59,10 +63,20 @@ export function findPreviewArray(
             initializerEnd
         );
 
+        const glyphs = metadata.sheet
+            ? parseGlyphs(structure, initializerStart, initializerEnd, metadata)
+            : undefined;
+        if (metadata.sheet && (!glyphs || !getSheetSize(
+            metadata.width, metadata.height, glyphs.length, metadata.sheet.columns
+        ))) {
+            return;
+        }
+
         return {
             metadata,
             name,
             values: parseArrayValues(initializerBody),
+            glyphs,
             declarationStart,
             initializerStart,
             initializerEnd
@@ -173,6 +187,26 @@ function parseMetadata(
     }
 
     const height = value.height as number;
+    const bitOrder = value.bitOrder === undefined ? "msb" : value.bitOrder;
+    if (bitOrder !== "msb" && bitOrder !== "lsb") {
+        return;
+    }
+    if (value.type === "rgb565" && value.bitOrder !== undefined) {
+        return;
+    }
+
+    let sheet: PreviewMetadata["sheet"];
+    if (value.sheet !== undefined) {
+        if (value.type !== "1bpp" || packing !== "packed" ||
+            typeof value.sheet !== "object" || value.sheet === null || Array.isArray(value.sheet)) {
+            return;
+        }
+        const columns = (value.sheet as Record<string, unknown>).columns;
+        if (!Number.isSafeInteger(columns) || (columns as number) < 1 || (columns as number) > 1024) {
+            return;
+        }
+        sheet = { columns: columns as number };
+    }
 
     if (width <= 0 || height <= 0) {
         return;
@@ -187,8 +221,77 @@ function parseMetadata(
         width,
         height,
         layout: value.layout,
-        packing
+        packing,
+        bitOrder,
+        sheet
     };
+}
+
+function maskComments(source: string): string {
+    return source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g,
+        comment => comment.replace(/[^\r\n]/g, " "));
+}
+
+function parseGlyphs(
+    source: string, start: number, end: number, metadata: PreviewMetadata
+): PreviewGlyph[] | undefined {
+    const glyphs: PreviewGlyph[] = [];
+    const expected = metadata.layout === "horizontal"
+        ? Math.ceil(metadata.width / 8) * metadata.height
+        : Math.ceil(metadata.height / 8) * metadata.width;
+    const body = source.slice(start + 1, end);
+    if (!body.trimStart().startsWith("{")) {
+        return parseFlatGlyphs(body, start + 1, expected);
+    }
+    let cursor = start + 1;
+    while (cursor < end) {
+        while (/\s/.test(source[cursor] ?? "") && cursor < end) { cursor++; }
+        if (cursor === end) { break; }
+        if (source[cursor] !== "{") { return; }
+        const close = findMatchingBrace(source, cursor);
+        if (close < 0 || close >= end) { return; }
+        const body = source.slice(cursor + 1, close).trim().replace(/,\s*$/, "");
+        const tokens = body.split(",").map(token => token.trim());
+        if (tokens.length !== expected || tokens.some(token =>
+            !/^(?:0[xX][0-9a-fA-F]+|0[bB][01]+|0|[1-9]\d*)$/.test(token)
+        )) { return; }
+        const values = tokens.map(parseIntegerLiteral);
+        if (values.some(value => value > 255)) { return; }
+        glyphs.push({ values, start: cursor, end: close });
+        cursor = close + 1;
+        while (cursor < end && /\s/.test(source[cursor])) { cursor++; }
+        if (cursor < end) {
+            if (source[cursor] !== ",") { return; }
+            cursor++;
+        }
+    }
+    return glyphs.length ? glyphs : undefined;
+}
+
+function parseFlatGlyphs(body: string, offset: number, bytesPerGlyph: number): PreviewGlyph[] | undefined {
+    const literal = /\s*(0[xX][0-9a-fA-F]+|0[bB][01]+|0|[1-9]\d*)\s*(,|$)/y;
+    const glyphs: PreviewGlyph[] = [];
+    let values: number[] = [];
+    let glyphStart = offset;
+    let cursor = 0;
+    while (cursor < body.length) {
+        while (cursor < body.length && /\s/.test(body[cursor])) { cursor++; }
+        if (cursor === body.length) { break; }
+        literal.lastIndex = cursor;
+        const match = literal.exec(body);
+        if (!match) { return; }
+        const value = parseIntegerLiteral(match[1]);
+        if (value > 255) { return; }
+        if (values.length === 0) { glyphStart = offset + cursor; }
+        values.push(value);
+        const tokenEnd = offset + cursor + match[1].length - 1;
+        if (values.length === bytesPerGlyph) {
+            glyphs.push({ values, start: glyphStart, end: tokenEnd });
+            values = [];
+        }
+        cursor = literal.lastIndex;
+    }
+    return glyphs.length && values.length === 0 ? glyphs : undefined;
 }
 
 function findMatchingBrace(

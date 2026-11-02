@@ -17,6 +17,8 @@ Supported formats: packed/unpacked 1bpp and RGB565 little-endian byte arrays.
 - Preview C and C++ array data on hover
 - Explicit metadata-based format selection
 - 1bpp bitmap rendering
+- MSB/LSB bit order selection for packed 1bpp
+- Font sheets from nested or flat byte arrays, with individual glyph previews
 - RGB565 color rendering from little-endian 8-bit arrays
 - Horizontal and vertical data layouts
 - Support for .c, .h, .cpp, and .hpp files
@@ -53,7 +55,8 @@ const uint8_t example_image[] = {
 ### Pixel packing
 
 `packing` is optional and defaults to `"packed"`, where each array element
-stores eight pixels, most significant bit first. Existing annotations work unchanged.
+stores eight pixels, most significant bit first by default. Use `bitOrder` to
+select LSB-first data. Existing annotations work unchanged.
 
 Use `"packing":"unpacked"` for arrays with one `0` or `1` per pixel:
 
@@ -67,6 +70,47 @@ const uint8_t image[] = {
 
 For unpacked data, `horizontal` reads row by row and `vertical` reads column
 by column. Both require `width * height` elements, without bit padding.
+
+### Font sheets and bit order
+
+For packed 1bpp images, `bitOrder` selects `"msb"` (the default) or `"lsb"`.
+LSB reads bit 0 first, from left to right for horizontal layout or top to
+bottom for vertical layout. This setting does not change RGB565 byte order.
+
+To preview [dhepper/font8x8](https://github.com/dhepper/font8x8), add this
+annotation immediately above the font array declaration:
+
+```c
+// @preview {"type":"1bpp","width":8,"height":8,"layout":"horizontal","bitOrder":"lsb","sheet":{"columns":16}}
+char font8x8_basic[128][8] = {
+    // Keep the original font data here.
+};
+```
+
+Hover over the array name for a single grid image, or inside a glyph's
+`{ ... }` initializer for that glyph and its zero-based array index. Width
+and height describe one glyph. Blank glyphs keep their positions. Cells are
+placed directly next to each other without added spacing, preserving only
+the whitespace in the glyph data. The existing integer scaling policy
+applies to the complete sheet. The final row may have empty cells.
+
+Sheets support packed 1bpp with either nested glyph initializers or a flat
+array of literal bytes. Flat data is split into complete glyphs using width,
+height and layout (8 bytes for 8×8, 32 bytes for 16×16). Hover over a byte to
+preview its glyph; line breaks do not affect grouping. For example:
+
+```c
+// @preview {"type":"1bpp","width":8,"height":8,"layout":"horizontal","bitOrder":"lsb","sheet":{"columns":16}}
+const uint8_t font[] = {
+    0x0C, 0x1E, 0x33, 0x33, 0x3F, 0x33, 0x33, 0x00,
+    0x3F, 0x66, 0x66, 0x3E, 0x66, 0x66, 0x3F, 0x00
+};
+```
+
+Incomplete glyphs and mixed flat/nested initializers are not supported.
+Each glyph must have its full byte count. Macros, expressions, implicit
+zero-fill and designated initializers are not supported. Columns must be
+1–1024, and the complete sheet must not exceed 1,048,576 source pixels.
 
 ### RGB565
 
@@ -106,11 +150,26 @@ npm ci
 npm run compile
 ```
 
-To try the extension, open this project in Visual Studio Code and press `F5`
-to launch the Extension Development Host. In the new window, open a C or C++
+To try the extension, open this project in Visual Studio Code and press `Ctrl+F5`
+to launch the Extension Development Host without debugging. Use `F5` when you
+need breakpoints. In the new window, open a C or C++
 file containing the example above and hover over the array name or its contents.
 
+Run `npm run test:unit` and `npm run lint` to verify the build. To create an
+installable VSIX package:
+
+```bash
+npx --yes --package @vscode/vsce vsce package
+```
+
 ## Release Notes
+
+### 1.1.0
+
+Added MSB/LSB selection and font sheets for nested or flat packed 1bpp arrays.
+Hover over an array name for the complete sheet, or a glyph's data for an
+individual preview and array index. Cells have no added spacing. Array parsing
+now ignores braces in comments.
 
 ### 1.0.2
 
