@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import { findPreviewArray } from "./previewParser";
-import { render1bpp, renderRgb565, render1bppSheet } from "./previewRenderer";
+import { render1bpp, renderRgb565, renderBgr565, render1bppSheet } from "./previewRenderer";
 
 export function activate(
     context: vscode.ExtensionContext
@@ -35,7 +35,7 @@ export function activate(
                     const title = selectedGlyph ? `${name}[${glyphIndex}]` : name;
 
                     const requiredLength =
-                        metadata.type === "rgb565"
+                        metadata.type !== "1bpp"
                             ? metadata.width * metadata.height * 2
                             : metadata.packing === "unpacked"
                             ? metadata.width * metadata.height
@@ -58,16 +58,18 @@ export function activate(
                         return new vscode.Hover(md);
                     }
 
-                    if (metadata.type === "rgb565" && values.some(value =>
+                    if (metadata.type !== "1bpp" && values.some(value =>
                         !Number.isInteger(value) || value < 0 || value > 255
                     )) {
-                        return new vscode.Hover("RGB565 requires 8-bit array elements (0–255).");
+                        return new vscode.Hover(`${metadata.type.toUpperCase()} requires 8-bit array elements (0–255).`);
                     }
 
                     const base64 = preview.glyphs && !selectedGlyph
                         ? render1bppSheet(preview.glyphs.map(glyph => glyph.values), metadata)
                         : metadata.type === "rgb565"
                         ? renderRgb565(values, metadata.width, metadata.height, metadata.layout)
+                        : metadata.type === "bgr565"
+                        ? renderBgr565(values, metadata.width, metadata.height, metadata.layout)
                         : render1bpp(
                         values,
                         metadata.width,

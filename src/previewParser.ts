@@ -156,7 +156,7 @@ function parseMetadata(
 
     const value = raw as Record<string, unknown>;
 
-    if (value.type !== "1bpp" && value.type !== "rgb565") {
+    if (value.type !== "1bpp" && value.type !== "rgb565" && value.type !== "bgr565") {
         return;
     }
 
@@ -181,8 +181,8 @@ function parseMetadata(
         return;
     }
 
-    // RGB565 currently supports only packed, little-endian byte arrays.
-    if (value.type === "rgb565" && packing !== "packed") {
+    // Color 565 formats support only packed, little-endian byte arrays.
+    if (value.type !== "1bpp" && packing !== "packed") {
         return;
     }
 
@@ -191,7 +191,7 @@ function parseMetadata(
     if (bitOrder !== "msb" && bitOrder !== "lsb") {
         return;
     }
-    if (value.type === "rgb565" && value.bitOrder !== undefined) {
+    if (value.type !== "1bpp" && value.bitOrder !== undefined) {
         return;
     }
 

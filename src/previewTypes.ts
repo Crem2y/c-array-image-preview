@@ -6,7 +6,7 @@ export type PreviewPacking = "packed" | "unpacked";
 export type PreviewBitOrder = "msb" | "lsb";
 
 export interface PreviewMetadata {
-    type: "1bpp" | "rgb565";
+    type: "1bpp" | "rgb565" | "bgr565";
     width: number;
     height: number;
     layout: PreviewLayout;

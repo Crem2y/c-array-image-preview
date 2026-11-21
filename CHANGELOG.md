@@ -2,6 +2,11 @@
 
 All notable changes to the "C Array Image Preview" extension will be documented in this file.
 
+## 1.2.0 - 2026-11-21
+
+### Added
+- BGR565 image previews from little-endian 8-bit arrays, with horizontal and vertical layouts.
+
 ## 1.1.0 - 2026-11-02
 
 ### Added

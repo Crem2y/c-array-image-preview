@@ -82,6 +82,25 @@ export function renderRgb565(
     height: number,
     layout: PreviewLayout
 ): string {
+    return render565(values, width, height, layout, "rgb565");
+}
+
+export function renderBgr565(
+    values: number[],
+    width: number,
+    height: number,
+    layout: PreviewLayout
+): string {
+    return render565(values, width, height, layout, "bgr565");
+}
+
+function render565(
+    values: number[],
+    width: number,
+    height: number,
+    layout: PreviewLayout,
+    format: "rgb565" | "bgr565"
+): string {
     const scale = getPreviewScale(width, height);
     const png = new PNG({
         width: width * scale,
@@ -93,9 +112,9 @@ export function renderRgb565(
             const pixelIndex = layout === "horizontal" ? y * width + x : x * height + y;
             const byteIndex = pixelIndex * 2;
             const pixel = values[byteIndex] | (values[byteIndex + 1] << 8);
-            const red = (pixel >> 11) & 0x1f;
+            const red = (format === "rgb565" ? pixel >> 11 : pixel) & 0x1f;
             const green = (pixel >> 5) & 0x3f;
-            const blue = pixel & 0x1f;
+            const blue = (format === "rgb565" ? pixel : pixel >> 11) & 0x1f;
 
             drawScaledPixel(
                 png, x, y, scale,

@@ -13,7 +13,7 @@ Preview embedded bitmap and image data directly from C and C++ source code in Vi
 
 C Array Image Preview reads metadata from a source comment, parses the associated array, and renders the result when you hover over the array name or its contents.
 
-Supported formats: packed/unpacked 1bpp and RGB565 little-endian byte arrays.
+Supported formats: packed/unpacked 1bpp, RGB565 and BGR565 little-endian byte arrays.
 
 ## Features
 
@@ -22,7 +22,7 @@ Supported formats: packed/unpacked 1bpp and RGB565 little-endian byte arrays.
 - 1bpp bitmap rendering
 - MSB/LSB bit order selection for packed 1bpp
 - Font sheets from nested or flat byte arrays, with individual glyph previews
-- RGB565 color rendering from little-endian 8-bit arrays
+- RGB565 and BGR565 color rendering from little-endian 8-bit arrays
 - Horizontal and vertical data layouts
 - Support for .c, .h, .cpp, and .hpp files
 
@@ -78,7 +78,7 @@ by column. Both require `width * height` elements, without bit padding.
 
 For packed 1bpp images, `bitOrder` selects `"msb"` (the default) or `"lsb"`.
 LSB reads bit 0 first, from left to right for horizontal layout or top to
-bottom for vertical layout. This setting does not change RGB565 byte order.
+bottom for vertical layout. This setting does not change RGB565/BGR565 byte order.
 
 To preview [dhepper/font8x8](https://github.com/dhepper/font8x8), add this
 annotation immediately above the font array declaration:
@@ -115,7 +115,7 @@ Each glyph must have its full byte count. Macros, expressions, implicit
 zero-fill and designated initializers are not supported. Columns must be
 1–1024, and the complete sheet must not exceed 1,048,576 source pixels.
 
-### RGB565
+### RGB565 / BGR565
 
 Use `"type":"rgb565"` for an 8-bit array containing two bytes per pixel,
 low byte first (little-endian). Each 16-bit pixel contains red in bits 15–11,
@@ -133,13 +133,26 @@ const uint8_t colors[] = {
 };
 ```
 
+For BGR565, use `"type":"bgr565"`. Blue occupies bits 15–11, green bits
+10–5, and red bits 4–0. Byte order is still little-endian (low byte first):
+
+```c
+// @preview {"type":"bgr565","width":3,"height":1,"layout":"horizontal"}
+const uint8_t bgr_colors[] = {
+    0x1F, 0x00, // Red:   0x001F
+    0xE0, 0x07, // Green: 0x07E0
+    0x00, 0xF8  // Blue:  0xF800
+};
+```
+
 `horizontal` reads pixels row by row; `vertical` reads column by column.
 Both require `width * height * 2` bytes. Omit `packing` (defaults to `packed`);
-`unpacked`, 16-bit array elements, and big-endian data are not supported for RGB565.
+`unpacked`, `bitOrder`, font sheets, 16-bit array elements, and big-endian data
+are not supported for RGB565/BGR565.
 
 ### Preview size
 
-Both formats use integer pixel scaling (1×–4×). The largest scale that keeps
+All formats use integer pixel scaling (1×–4×). The largest scale that keeps
 the longer side within 256 pixels is selected, capped at 4×. Images already
 larger than 256 pixels are shown at 1× without downscaling.
 
@@ -166,6 +179,12 @@ npx --yes --package @vscode/vsce vsce package
 ```
 
 ## Release Notes
+
+### 1.2.0
+
+Added BGR565 previews from little-endian 8-bit arrays. Use `"type":"bgr565"`
+for blue in the high 5 bits and red in the low 5 bits, with horizontal or
+vertical pixel layouts.
 
 ### 1.1.0
 
