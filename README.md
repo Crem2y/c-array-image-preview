@@ -32,26 +32,14 @@ Add an `@preview` annotation immediately above the array.
 
 ```c
 /**
- * @brief Example 1bpp image
+ * @brief Image for extension icon
  * @preview {"type":"1bpp","width":16,"height":16,"layout":"horizontal"}
  */
-const uint8_t example_image[] = {
-    0xFF, 0xFF,
-    0x80, 0x01,
-    0x80, 0x01,
-    0x8C, 0x31,
-    0x8C, 0x31,
-    0x80, 0x01,
-    0x81, 0x81,
-    0xC0, 0x03,
-    0xA0, 0x05,
-    0x90, 0x09,
-    0x8F, 0xF1,
-    0x80, 0x01,
-    0x80, 0x01,
-    0x80, 0x01,
-    0x80, 0x01,
-    0xFF, 0xFF
+const uint8_t img[] = {
+    0x00, 0x00, 0x0F, 0x00, 0x3F, 0xC0, 0x30, 0xC0,
+    0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60,
+    0x30, 0xC0, 0x3F, 0xE0, 0x0F, 0x70, 0x00, 0x38,
+    0x00, 0x1C, 0x00, 0x0E, 0x00, 0x06, 0x00, 0x00
 };
 ```
 
@@ -74,11 +62,17 @@ const uint8_t image[] = {
 For unpacked data, `horizontal` reads row by row and `vertical` reads column
 by column. Both require `width * height` elements, without bit padding.
 
-### Font sheets and bit order
+### Bit order
 
 For packed 1bpp images, `bitOrder` selects `"msb"` (the default) or `"lsb"`.
 LSB reads bit 0 first, from left to right for horizontal layout or top to
 bottom for vertical layout. This setting does not change RGB565/BGR565 byte order.
+
+### Font sheets
+
+[dhepper/font8x8](https://github.com/dhepper/font8x8)
+
+![demo_font](doc/demo_font.gif)
 
 To preview [dhepper/font8x8](https://github.com/dhepper/font8x8), add this
 annotation immediately above the font array declaration:
@@ -180,6 +174,8 @@ npx --yes --package @vscode/vsce vsce package
 
 ## Release Notes
 
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ### 1.2.0
 
 Added BGR565 previews from little-endian 8-bit arrays. Use `"type":"bgr565"`
@@ -205,5 +201,3 @@ Updated repository, issue tracker, and homepage links after the repository renam
 
 First stable release with packed/unpacked 1bpp, little-endian RGB565,
 horizontal/vertical layouts, and automatic 1×–4× integer scaling.
-
-See [CHANGELOG.md](CHANGELOG.md) for release history.
